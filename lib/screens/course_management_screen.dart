@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../models/course.dart';
 import '../providers/schedule_provider.dart';
-import '../utils/time_utils.dart';
 import '../utils/app_theme.dart';
 import 'course_form_screen.dart';
 import 'course_import_screen.dart';

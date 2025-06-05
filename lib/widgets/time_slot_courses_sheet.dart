@@ -239,9 +239,9 @@ class TimeSlotCoursesSheet extends StatelessWidget {
         end = weeks[i];
       } else {
         if (start == end) {
-          ranges.add('第${start}周');
+          ranges.add('第$start周');
         } else {
-          ranges.add('第${start}-${end}周');
+          ranges.add('第$start-$end周');
         }
         start = weeks[i];
         end = weeks[i];
@@ -249,9 +249,9 @@ class TimeSlotCoursesSheet extends StatelessWidget {
     }
     
     if (start == end) {
-      ranges.add('第${start}周');
+      ranges.add('第$start周');
     } else {
-      ranges.add('第${start}-${end}周');
+      ranges.add('第$start-$end周');
     }
     
     return ranges.join(', ');

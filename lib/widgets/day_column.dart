@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../models/course.dart';
-import '../utils/time_utils.dart';
 import '../utils/app_theme.dart';
 import 'course_card.dart';
 

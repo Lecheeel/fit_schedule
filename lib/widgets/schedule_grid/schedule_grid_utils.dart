@@ -144,7 +144,7 @@ class ScheduleGridUtils {
     Map<String, List<Course>> groupedCourses = {};
     
     for (final course in courses) {
-      final timeSlotKey = '${course.classHours.join('-')}';
+      final timeSlotKey = course.classHours.join('-');
       if (!groupedCourses.containsKey(timeSlotKey)) {
         groupedCourses[timeSlotKey] = [];
       }
