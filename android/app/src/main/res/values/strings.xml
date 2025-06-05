@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FITschedule</string>
+    <string name="widget_description">显示今日课程安排</string>
+    <string name="today_schedule">今日课程</string>
+    <string name="no_courses_today">今日无课程安排</string>
+    <string name="click_to_open">点击打开课程表</string>
+    <string name="loading_courses">加载中...</string>
+</resources> 
