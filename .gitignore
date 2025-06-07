@@ -43,3 +43,78 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+.cursor/
+
+# Android Keystore files - 安全相关，绝对不要提交
+*.jks
+*.keystore
+*.p12
+*.key
+android_keystore.jks
+key.properties
+keystore.properties
+
+# Android 构建相关
+android/app/release/
+android/app/debug/
+android/app/profile/
+android/key.properties
+android/keystore.properties
+android/.gradle/
+android/app/.cxx/
+android/app/build/
+android/build/
+android/gradle/
+android/gradlew*
+android/local.properties
+
+# 环境配置文件
+.env
+.env.local
+.env.development
+.env.staging
+.env.production
+.env.*.local
+
+# 构建输出
+*.apk
+*.aab
+*.ipa
+build/
+dist/
+out/
+
+# 临时文件
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# 备份文件
+*.bak
+*.backup
+*~
+
+# 日志文件
+*.log
+logs/
+crash_reports/
+
+# IDE 和编辑器
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+*.sublime-*
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/usage.statistics.xml
+.idea/dictionaries/
+.idea/shelf/
+
+# 操作系统
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.Trash/
+.nfs*
