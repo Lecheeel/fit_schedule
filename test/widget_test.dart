@@ -7,24 +7,39 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 
 import 'package:fit_schedule/main.dart';
+import 'package:fit_schedule/providers/schedule_provider.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp(isDarkMode: false));
+  testWidgets('App smoke test', (WidgetTester tester) async {
+    // 创建测试用的ScheduleProvider
+    final scheduleProvider = ScheduleProvider();
+    
+    // Build our app and trigger a frame with proper provider setup
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => scheduleProvider),
+        ],
+        child: const MyApp(isDarkMode: false),
+      ),
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // 等待widget完全构建
+    await tester.pumpAndSettle();
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // 验证应用成功启动，可以找到周视图标签
+    expect(find.text('周视图'), findsOneWidget);
+    
+    // 验证底部导航栏存在
+    expect(find.byType(NavigationBar), findsOneWidget);
+    
+    // 验证所有四个导航项都存在
+    expect(find.text('周视图'), findsOneWidget);
+    expect(find.text('日视图'), findsOneWidget);
+    expect(find.text('课程'), findsOneWidget);
+    expect(find.text('设置'), findsOneWidget);
   });
 }
