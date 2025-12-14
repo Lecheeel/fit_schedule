@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/semester.dart';
+import '../models/schedule.dart';
 import '../providers/schedule_provider.dart';
 import '../widgets/week_selector.dart';
 import '../widgets/date_header.dart';
 import '../widgets/week_schedule_grid.dart';
+import 'schedule_management_screen.dart';
+import 'course_import_screen.dart';
 
 class WeekViewScreen extends StatefulWidget {
   const WeekViewScreen({super.key});
@@ -16,7 +18,7 @@ class WeekViewScreen extends StatefulWidget {
 class _WeekViewScreenState extends State<WeekViewScreen> {
   // 跟踪水平滑动
   late PageController _pageController;
-  
+
   @override
   void initState() {
     super.initState();
@@ -38,25 +40,27 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
     final scheduleProvider = Provider.of<ScheduleProvider>(context);
     final currentWeek = scheduleProvider.currentWeek;
     final selectedWeek = scheduleProvider.selectedWeek;
-    final semester = scheduleProvider.currentSemester;
-    
-    // 未添加学期
-    if (semester == null) {
-      return _buildEmptySemesterView(context);
+    final currentSchedule = scheduleProvider.currentSchedule;
+
+    // 未添加课表
+    if (currentSchedule == null) {
+      return _buildEmptyScheduleView(context);
     }
 
-    // 有学期但课表为空
+    // 有课表但课程为空
     if (scheduleProvider.courses.isEmpty) {
-      return _buildEmptyCourseView(context);
+      return _buildEmptyCourseView(context, currentSchedule);
     }
 
     return Column(
       children: [
-        // 周次选择器
+        // 周次选择器（包含课表切换按钮）
         WeekSelector(
           currentWeek: currentWeek,
           selectedWeek: selectedWeek,
-          totalWeeks: semester.numberOfWeeks,
+          totalWeeks: currentSchedule.numberOfWeeks,
+          scheduleName: currentSchedule.name,
+          hasMultipleSchedules: scheduleProvider.schedules.length > 1,
           onWeekSelected: (week) {
             scheduleProvider.setSelectedWeek(week);
             _pageController.animateToPage(
@@ -65,8 +69,9 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
               curve: Curves.easeInOut,
             );
           },
+          onScheduleTap: () => _showScheduleSwitcher(context),
         ),
-        
+
         // 周视图表格
         Expanded(
           child: PageView.builder(
@@ -74,10 +79,10 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
             onPageChanged: (index) {
               scheduleProvider.setSelectedWeek(index + 1);
             },
-            itemCount: semester.numberOfWeeks,
+            itemCount: currentSchedule.numberOfWeeks,
             itemBuilder: (context, index) {
               final weekNumber = index + 1;
-              return _buildWeekSchedule(context, weekNumber, semester);
+              return _buildWeekSchedule(context, weekNumber, currentSchedule);
             },
           ),
         ),
@@ -86,108 +91,282 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
   }
 
   // 构建周课表
-  Widget _buildWeekSchedule(BuildContext context, int weekNumber, Semester semester) {
+  Widget _buildWeekSchedule(BuildContext context, int weekNumber, Schedule schedule) {
     // 获取该周的日期范围
-    final weekRange = semester.getWeekRange(weekNumber);
+    final weekRange = schedule.getWeekRange(weekNumber);
     final weekDates = weekRange.getAllDates();
-    
+
     return Column(
       children: [
         // 显示日期栏
         DateHeader(weekDates: weekDates),
-        
+
         // 课表主体
         Expanded(
-          child: WeekScheduleGrid(weekNumber: weekNumber),
+          child: WeekScheduleGrid(
+            weekNumber: weekNumber,
+            weekDates: weekDates,
+          ),
         ),
       ],
     );
   }
 
-  // 构建空课表视图（有学期但无课程时显示）
-  Widget _buildEmptyCourseView(BuildContext context) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
+  // 显示课表切换器
+  void _showScheduleSwitcher(BuildContext context) {
+    final provider = Provider.of<ScheduleProvider>(context, listen: false);
+    final schedules = provider.schedules;
+    final currentSchedule = provider.currentSchedule;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.6,
+        ),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // 图标
-            Icon(
-              Icons.calendar_month_outlined,
-              size: 80,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+            // 拖动条
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-            const SizedBox(height: 24),
             
             // 标题
-            Text(
-              '课表为空',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            
-            // 提示信息
-            Text(
-              '快速添加课程，开始你的学习之旅',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 32),
-            
-            // 教务系统导入卡片
-            _buildAddCourseCard(
-              context,
-              icon: Icons.cloud_download,
-              title: '从教务系统导入',
-              description: '登录教务系统，一键获取完整课表',
-              color: Colors.blue,
-              isPrimary: true,
-              onTap: () {
-                Navigator.pushNamed(context, '/course_import');
-              },
-            ),
-            const SizedBox(height: 16),
-            
-            // 手动添加课程卡片
-            _buildAddCourseCard(
-              context,
-              icon: Icons.add_circle_outline,
-              title: '手动添加课程',
-              description: '自己动手，逐个添加课程信息',
-              color: Colors.green,
-              isPrimary: false,
-              onTap: () {
-                Navigator.pushNamed(context, '/course_management');
-              },
-            ),
-            const SizedBox(height: 24),
-            
-            // 提示文本
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  size: 16,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '推荐使用教务系统导入，更快更准确',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontStyle: FontStyle.italic,
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Text(
+                    '切换课表',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
-                ),
-              ],
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ScheduleManagementScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.settings, size: 18),
+                    label: const Text('管理'),
+                  ),
+                ],
+              ),
             ),
+
+            const Divider(height: 1),
+
+            // 课表列表
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: schedules.length,
+                itemBuilder: (context, index) {
+                  final schedule = schedules[index];
+                  final isActive = schedule.id == currentSchedule?.id;
+
+                  return ListTile(
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.surfaceContainerHighest,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isActive ? Icons.check : Icons.calendar_month,
+                        color: isActive
+                            ? Colors.white
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                        size: 20,
+                      ),
+                    ),
+                    title: Text(
+                      schedule.name,
+                      style: TextStyle(
+                        fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                    subtitle: Text(schedule.shortDescription),
+                    trailing: isActive
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '当前',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          )
+                        : null,
+                    onTap: isActive
+                        ? null
+                        : () async {
+                            Navigator.pop(context);
+                            await provider.switchSchedule(schedule.id!);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('已切换到"${schedule.name}"'),
+                                ),
+                              );
+                            }
+                          },
+                  );
+                },
+              ),
+            ),
+
+            // 底部安全区域
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
           ],
         ),
       ),
+    );
+  }
+
+  // 构建空课表视图（有课表但无课程时显示）
+  Widget _buildEmptyCourseView(BuildContext context, Schedule schedule) {
+    return Column(
+      children: [
+        // 周次选择器（保持显示）
+        Consumer<ScheduleProvider>(
+          builder: (context, provider, child) {
+            return WeekSelector(
+              currentWeek: provider.currentWeek,
+              selectedWeek: provider.selectedWeek,
+              totalWeeks: schedule.numberOfWeeks,
+              scheduleName: schedule.name,
+              hasMultipleSchedules: provider.schedules.length > 1,
+              onWeekSelected: (week) => provider.setSelectedWeek(week),
+              onScheduleTap: () => _showScheduleSwitcher(context),
+            );
+          },
+        ),
+        
+        // 空状态内容
+        Expanded(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // 图标
+                  Icon(
+                    Icons.calendar_month_outlined,
+                    size: 80,
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // 标题
+                  Text(
+                    '课表为空',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // 提示信息
+                  Text(
+                    '快速添加课程，开始你的学习之旅',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // 教务系统导入卡片
+                  _buildAddCourseCard(
+                    context,
+                    icon: Icons.cloud_download,
+                    title: '从教务系统导入',
+                    description: '登录教务系统，一键获取完整课表',
+                    color: Colors.blue,
+                    isPrimary: true,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CourseImportScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 手动添加课程卡片
+                  _buildAddCourseCard(
+                    context,
+                    icon: Icons.add_circle_outline,
+                    title: '手动添加课程',
+                    description: '自己动手，逐个添加课程信息',
+                    color: Colors.green,
+                    isPrimary: false,
+                    onTap: () {
+                      Navigator.pushNamed(context, '/course_management');
+                    },
+                  ),
+                  const SizedBox(height: 24),
+
+                  // 提示文本
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '推荐使用教务系统导入，更快更准确',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              fontStyle: FontStyle.italic,
+                            ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -227,7 +406,7 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
               child: Icon(icon, color: color, size: 32),
             ),
             const SizedBox(width: 16),
-            
+
             // 文字内容
             Expanded(
               child: Column(
@@ -277,7 +456,7 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
                 ],
               ),
             ),
-            
+
             // 箭头
             Icon(
               Icons.arrow_forward_ios,
@@ -290,8 +469,8 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
     );
   }
 
-  // 构建空学期视图（未添加学期时显示）
-  Widget _buildEmptySemesterView(BuildContext context) {
+  // 构建空课表视图（未添加课表时显示）
+  Widget _buildEmptyScheduleView(BuildContext context) {
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(32),
@@ -305,95 +484,64 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
               color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
             ),
             const SizedBox(height: 24),
-            
+
             // 标题
             Text(
-              '欢迎使用课程表',
+              '欢迎使用 FITschedule',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: 8),
-            
+
             // 提示信息
             Text(
-              '请先添加学期信息以开始使用',
+              '创建你的第一个课表开始使用',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             ),
             const SizedBox(height: 32),
-            
-            // 智能添加按钮
+
+            // 智能创建按钮
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: () => _quickAddCurrentSemester(context),
+                onPressed: () => _createSmartScheduleAndImport(context),
                 icon: const Icon(Icons.auto_awesome),
-                label: const Text('智能添加本学期'),
+                label: const Text('智能创建课表'),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            
-            // 手动添加按钮
+            const SizedBox(height: 8),
+            Text(
+              '自动命名并从教务系统导入课程',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: 16),
+
+            // 手动创建按钮
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () {
-                  Navigator.pushNamed(context, '/semester_management');
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ScheduleManagementScreen(),
+                    ),
+                  );
                 },
                 icon: const Icon(Icons.edit_calendar),
-                label: const Text('手动添加学期'),
+                label: const Text('手动创建课表'),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
-            
-            // 分隔线
-            const Divider(),
-            const SizedBox(height: 16),
-            
-            // 快速模板标题
-            Text(
-              '或选择快速模板',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            // 快速模板按钮
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              alignment: WrapAlignment.center,
-              children: [
-                _buildQuickTemplateChip(
-                  context,
-                  label: '秋季学期',
-                  onTap: () => _addSemesterTemplate(context, isFallSemester: true),
-                ),
-                _buildQuickTemplateChip(
-                  context,
-                  label: '春季学期',
-                  onTap: () => _addSemesterTemplate(context, isFallSemester: false),
-                ),
-                _buildQuickTemplateChip(
-                  context,
-                  label: '16周学期',
-                  onTap: () => _addCustomWeeksSemester(context, weeks: 16),
-                ),
-                _buildQuickTemplateChip(
-                  context,
-                  label: '18周学期',
-                  onTap: () => _addCustomWeeksSemester(context, weeks: 18),
-                ),
-              ],
             ),
           ],
         ),
@@ -401,173 +549,29 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
     );
   }
 
-  // 构建快速模板芯片
-  Widget _buildQuickTemplateChip(
-    BuildContext context, {
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return ActionChip(
-      label: Text(label),
-      onPressed: onTap,
-      avatar: const Icon(Icons.add, size: 18),
-    );
-  }
-
-  // 智能添加当前学期
-  void _quickAddCurrentSemester(BuildContext context) async {
-    final now = DateTime.now();
-    final year = now.year;
-    final month = now.month;
-    
-    // 根据月份判断学期
-    // 2-7月为春季学期，8月-次年1月为秋季学期
-    final isFallSemester = month >= 8 || month <= 1;
-    
-    String semesterName;
-    DateTime startDate;
-    int numberOfWeeks = 20;
-    
-    if (isFallSemester) {
-      // 秋季学期（第一学期）
-      final academicYear = month >= 8 ? year : year - 1;
-      semesterName = '$academicYear-${academicYear + 1}学年第一学期';
-      // 秋季学期通常9月初开学，找到9月的第一个周一
-      startDate = _findFirstMondayOfMonth(academicYear, 9);
-    } else {
-      // 春季学期（第二学期）
-      semesterName = '${year - 1}-$year学年第二学期';
-      // 春季学期通常2月底或3月初开学，找到3月的第一个周一
-      startDate = _findFirstMondayOfMonth(year, 3);
-    }
-    
-    // 如果计算出的开学日期在未来，可能是上一学期
-    if (startDate.isAfter(now)) {
-      if (isFallSemester) {
-        // 当前可能是上一年的秋季学期
-        semesterName = '${year - 1}-$year学年第一学期';
-        startDate = _findFirstMondayOfMonth(year - 1, 9);
-      } else {
-        // 当前可能是去年的春季学期
-        semesterName = '${year - 2}-${year - 1}学年第二学期';
-        startDate = _findFirstMondayOfMonth(year - 1, 3);
-      }
-    }
-    
-    final semester = Semester(
-      name: semesterName,
-      startDate: startDate,
-      numberOfWeeks: numberOfWeeks,
-      isActive: true,
-    );
-    
-    await _saveSemester(context, semester);
-  }
-
-  // 添加学期模板
-  void _addSemesterTemplate(BuildContext context, {required bool isFallSemester}) async {
-    final now = DateTime.now();
-    final year = now.year;
-    
-    String semesterName;
-    DateTime startDate;
-    
-    if (isFallSemester) {
-      // 秋季学期
-      final academicYear = now.month >= 8 ? year : year - 1;
-      semesterName = '$academicYear-${academicYear + 1}学年第一学期';
-      startDate = _findFirstMondayOfMonth(academicYear, 9);
-    } else {
-      // 春季学期
-      semesterName = '${year - 1}-$year学年第二学期';
-      startDate = _findFirstMondayOfMonth(year, 3);
-    }
-    
-    final semester = Semester(
-      name: semesterName,
-      startDate: startDate,
-      numberOfWeeks: 20,
-      isActive: true,
-    );
-    
-    await _saveSemester(context, semester);
-  }
-
-  // 添加自定义周数的学期
-  void _addCustomWeeksSemester(BuildContext context, {required int weeks}) async {
-    final now = DateTime.now();
-    final year = now.year;
-    final month = now.month;
-    
-    // 根据月份判断学期
-    final isFallSemester = month >= 8 || month <= 1;
-    
-    String semesterName;
-    DateTime startDate;
-    
-    if (isFallSemester) {
-      final academicYear = month >= 8 ? year : year - 1;
-      semesterName = '$academicYear-${academicYear + 1}学年第一学期';
-      startDate = _findFirstMondayOfMonth(academicYear, 9);
-    } else {
-      semesterName = '${year - 1}-$year学年第二学期';
-      startDate = _findFirstMondayOfMonth(year, 3);
-    }
-    
-    // 如果计算出的开学日期在未来，调整为上一学年
-    if (startDate.isAfter(now)) {
-      if (isFallSemester) {
-        semesterName = '${year - 1}-$year学年第一学期';
-        startDate = _findFirstMondayOfMonth(year - 1, 9);
-      } else {
-        semesterName = '${year - 2}-${year - 1}学年第二学期';
-        startDate = _findFirstMondayOfMonth(year - 1, 3);
-      }
-    }
-    
-    final semester = Semester(
-      name: semesterName,
-      startDate: startDate,
-      numberOfWeeks: weeks,
-      isActive: true,
-    );
-    
-    await _saveSemester(context, semester);
-  }
-
-  // 找到指定年月的第一个周一
-  DateTime _findFirstMondayOfMonth(int year, int month) {
-    var date = DateTime(year, month, 1);
-    // weekday: 1-7 对应周一到周日
-    while (date.weekday != DateTime.monday) {
-      date = date.add(const Duration(days: 1));
-    }
-    return date;
-  }
-
-  // 保存学期
-  Future<void> _saveSemester(BuildContext context, Semester semester) async {
+  // 智能创建课表并跳转导入
+  Future<void> _createSmartScheduleAndImport(BuildContext context) async {
     final provider = Provider.of<ScheduleProvider>(context, listen: false);
-    
+
     try {
-      await provider.addSemester(semester);
+      await provider.createSmartSchedule();
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('已添加学期"${semester.name}"'),
-            duration: const Duration(seconds: 2),
-          ),
+          const SnackBar(content: Text('课表已创建，正在跳转到导入页面...')),
+        );
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const CourseImportScreen()),
         );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('添加失败: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('创建失败: $e')),
         );
       }
     }
   }
-} 
+}

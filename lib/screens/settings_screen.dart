@@ -7,7 +7,6 @@ import '../utils/developer_tools_handler.dart';
 import '../widgets/settings_sections/appearance_section.dart';
 import '../widgets/settings_sections/schedule_section.dart';
 import '../widgets/settings_sections/notification_section.dart';
-import '../widgets/settings_sections/semester_section.dart';
 import '../widgets/settings_sections/about_section.dart';
 import '../widgets/settings_sections/developer_section.dart';
 import '../widgets/settings_sections/developer_card.dart';
@@ -15,7 +14,7 @@ import '../widgets/settings_dialogs/reminder_dialog.dart';
 import '../widgets/settings_dialogs/about_dialog.dart';
 import '../widgets/settings_dialogs/developer_easter_egg_dialog.dart';
 import '../widgets/settings_dialogs/system_info_dialog.dart';
-import 'semester_management_screen.dart';
+import 'schedule_management_screen.dart';
 import 'course_import_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -76,16 +75,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
 
-          // 课表设置
-          ScheduleSection(
-            showNonCurrentWeekCourses: _showNonCurrentWeekCourses,
-            onShowNonCurrentWeekCoursesChanged: (value) {
-              setState(() => _showNonCurrentWeekCourses = value);
-              _saveSettings();
-              scheduleProvider.setShowNonCurrentWeekCourses(value);
-            },
-            onImportCourse: () => _navigateToImportCourse(context),
+          // 课表管理
+          ScheduleSettingsSection(
+            onManageSchedules: () => _navigateToScheduleManagement(context),
+            onCreateSmartSchedule: () => _createSmartScheduleAndImport(context),
           ),
+
+          // 课表显示设置
+          _buildScheduleDisplaySection(scheduleProvider),
 
           // 通知设置
           NotificationSection(
@@ -101,18 +98,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 setState(() => _reminderMinutes = newMinutes);
                 _saveSettings();
               }
-            },
-          ),
-
-          // 学期管理
-          SemesterSection(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SemesterManagementScreen(),
-                ),
-              );
             },
           ),
 
@@ -146,6 +131,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  // 构建课表显示设置区块
+  Widget _buildScheduleDisplaySection(ScheduleProvider scheduleProvider) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Text(
+            '课表显示',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ),
+        SwitchListTile(
+          title: const Text('显示非本周课程'),
+          subtitle: const Text('以灰色显示不在当前周上课的课程'),
+          value: _showNonCurrentWeekCourses,
+          onChanged: (value) {
+            setState(() => _showNonCurrentWeekCourses = value);
+            _saveSettings();
+            scheduleProvider.setShowNonCurrentWeekCourses(value);
+          },
+        ),
+        ListTile(
+          leading: const Icon(Icons.cloud_download),
+          title: const Text('导入课程'),
+          subtitle: const Text('从教务系统导入课程'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _navigateToImportCourse(context),
+        ),
+        const Divider(),
+      ],
+    );
+  }
+
+  // 导航到课表管理页面
+  void _navigateToScheduleManagement(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const ScheduleManagementScreen(),
+      ),
+    );
+  }
+
+  // 智能创建课表并导入
+  Future<void> _createSmartScheduleAndImport(BuildContext context) async {
+    final provider = Provider.of<ScheduleProvider>(context, listen: false);
+
+    try {
+      await provider.createSmartSchedule();
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('课表已创建，正在跳转到导入页面...')),
+        );
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const CourseImportScreen()),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('创建失败: $e')),
+        );
+      }
+    }
   }
 
   // 导航到导入课表页面

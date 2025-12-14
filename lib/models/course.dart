@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 class Course {
   final int? id; // 数据库ID
+  final int? scheduleId; // 所属课表ID
   final String name; // 课程名称
   final String? teacher; // 教师
   final String? location; // 上课地点
@@ -14,6 +15,7 @@ class Course {
 
   Course({
     this.id,
+    this.scheduleId,
     required this.name,
     this.teacher,
     this.location,
@@ -28,6 +30,7 @@ class Course {
   factory Course.fromMap(Map<String, dynamic> map) {
     return Course(
       id: map['id'],
+      scheduleId: map['scheduleId'],
       name: map['name'],
       teacher: map['teacher'],
       location: map['location'],
@@ -43,6 +46,7 @@ class Course {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'scheduleId': scheduleId,
       'name': name,
       'teacher': teacher,
       'location': location,
@@ -57,6 +61,7 @@ class Course {
   // 创建Course对象的副本
   Course copyWith({
     int? id,
+    int? scheduleId,
     String? name,
     String? teacher,
     String? location,
@@ -68,6 +73,7 @@ class Course {
   }) {
     return Course(
       id: id ?? this.id,
+      scheduleId: scheduleId ?? this.scheduleId,
       name: name ?? this.name,
       teacher: teacher ?? this.teacher,
       location: location ?? this.location,
@@ -143,4 +149,4 @@ class TimeRange {
     final minute = time.minute.toString().padLeft(2, '0');
     return '$hour:$minute';
   }
-} 
+}

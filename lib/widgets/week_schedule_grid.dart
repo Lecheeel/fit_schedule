@@ -10,10 +10,12 @@ import 'schedule_grid/schedule_grid_utils.dart';
 /// 周课表网格组件
 class WeekScheduleGrid extends StatelessWidget {
   final int weekNumber;
+  final List<DateTime>? weekDates; // 当前周的日期列表，用于高亮今天
 
   const WeekScheduleGrid({
     super.key,
     required this.weekNumber,
+    this.weekDates,
   });
 
   @override
@@ -78,6 +80,7 @@ class WeekScheduleGrid extends StatelessWidget {
           timeColumnWidth: sizes['timeColumnWidth']!,
           classHourHeight: sizes['classHourHeight']!,
           restHeight: sizes['restHeight']!,
+          weekDates: weekDates,
         ),
         
         // 课程卡片层

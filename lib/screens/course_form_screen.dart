@@ -204,6 +204,7 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
     // 创建课程对象
     final course = Course(
       id: _isEditing ? widget.course!.id : null,
+      scheduleId: _isEditing ? widget.course!.scheduleId : null,
       name: _nameController.text.trim(),
       teacher: _teacherController.text.trim().isEmpty
           ? null
@@ -248,4 +249,4 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
       }
     }
   }
-} 
+}

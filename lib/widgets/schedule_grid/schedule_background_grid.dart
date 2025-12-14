@@ -7,13 +7,23 @@ class ScheduleBackgroundGrid extends StatelessWidget {
   final double timeColumnWidth;
   final double classHourHeight;
   final double restHeight;
+  final List<DateTime>? weekDates; // 当前周的日期列表
 
   const ScheduleBackgroundGrid({
     super.key,
     required this.timeColumnWidth,
     required this.classHourHeight,
     required this.restHeight,
+    this.weekDates,
   });
+
+  /// 检查指定日期是否是今天
+  bool _isToday(int dayIndex) {
+    if (weekDates == null || dayIndex >= weekDates!.length) return false;
+    final date = weekDates![dayIndex];
+    final now = DateTime.now();
+    return date.year == now.year && date.month == now.month && date.day == now.day;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -127,9 +137,15 @@ class ScheduleBackgroundGrid extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: List.generate(7, (dayIndex) {
+                // 使用精确日期判断是否是今天
+                final isToday = _isToday(dayIndex);
                 return Expanded(
                   child: Container(
                     decoration: BoxDecoration(
+                      // 今天的列添加略深的背景色
+                      color: isToday 
+                          ? Theme.of(context).colorScheme.primary.withOpacity(0.08)
+                          : null,
                       border: Border(
                         right: dayIndex < 6 ? BorderSide(
                           color: AppTheme.gridLineColor,
@@ -147,7 +163,7 @@ class ScheduleBackgroundGrid extends StatelessWidget {
     );
   }
 
-  /// 构建休息时间行（跨列显示）
+  /// 构建休息时间行（跨列显示，不高亮今日）
   Widget _buildBreakRow(BuildContext context, String text) {
     return Container(
       height: restHeight,
@@ -159,7 +175,8 @@ class ScheduleBackgroundGrid extends StatelessWidget {
             width: 0.5,
           ),
         ),
-      ),      child: Row(
+      ),
+      child: Row(
         children: [
           // 保持时间列的宽度一致性
           Container(
@@ -173,10 +190,9 @@ class ScheduleBackgroundGrid extends StatelessWidget {
               ),
             ),
           ),
-          // 跨列显示休息时间
+          // 跨列显示休息时间文字
           Expanded(
-            child: Container(
-              alignment: Alignment.center,
+            child: Center(
               child: Text(
                 text,
                 style: TextStyle(

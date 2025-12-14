@@ -11,7 +11,7 @@ import 'screens/course_management_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/course_form_screen.dart';
 import 'screens/course_import_screen.dart';
-import 'screens/semester_management_screen.dart';
+import 'screens/schedule_management_screen.dart';
 import 'utils/app_theme.dart';
 import 'models/course.dart';
 
@@ -72,7 +72,7 @@ class MyApp extends StatelessWidget {
         '/course-form': (context) => CourseFormScreen(),
         '/course_import': (context) => const CourseImportScreen(),
         '/course_management': (context) => const CourseManagementScreen(),
-        '/semester_management': (context) => const SemesterManagementScreen(),
+        '/schedule_management': (context) => const ScheduleManagementScreen(),
       },
       // 添加路由生成器，处理需要传参的路由
       onGenerateRoute: (settings) {
@@ -99,15 +99,22 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
   
-  static const List<Widget> _widgetOptions = <Widget>[
-    WeekViewScreen(),
-    DayViewScreen(),
-    CourseManagementScreen(),
-    SettingsScreen(),
-  ];
-  
+  // 使用GlobalKey来控制周视图和日视图的重置
+  final GlobalKey<WeekViewWrapperState> _weekViewKey = GlobalKey<WeekViewWrapperState>();
+  final GlobalKey<DayViewWrapperState> _dayViewKey = GlobalKey<DayViewWrapperState>();
   
   void _onItemTapped(int index) {
+    // 切换到周视图时，重置到当前周
+    if (index == 0) {
+      final scheduleProvider = Provider.of<ScheduleProvider>(context, listen: false);
+      scheduleProvider.resetToCurrentWeek();
+      _weekViewKey.currentState?.resetToCurrentWeek();
+    }
+    // 切换到日视图时，重置到今天
+    else if (index == 1) {
+      _dayViewKey.currentState?.resetToToday();
+    }
+    
     setState(() {
       _selectedIndex = index;
     });
@@ -115,6 +122,14 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    // 构建页面列表，使用包装器来支持重置功能
+    final List<Widget> widgetOptions = <Widget>[
+      WeekViewWrapper(key: _weekViewKey),
+      DayViewWrapper(key: _dayViewKey),
+      const CourseManagementScreen(),
+      const SettingsScreen(),
+    ];
+    
     // 确保应用安全区域
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark.copyWith(
@@ -126,7 +141,7 @@ class _HomePageState extends State<HomePage> {
         body: SafeArea(
           // bottom设为false让内容延伸到底部，以适配全面屏
           bottom: false,
-          child: _widgetOptions.elementAt(_selectedIndex),
+          child: widgetOptions.elementAt(_selectedIndex),
         ),
         // 设置背景色与应用背景相同
         backgroundColor: Theme.of(context).colorScheme.surface,
@@ -164,5 +179,53 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+}
+
+// 周视图包装器，用于支持重置到当前周
+class WeekViewWrapper extends StatefulWidget {
+  const WeekViewWrapper({super.key});
+
+  @override
+  State<WeekViewWrapper> createState() => WeekViewWrapperState();
+}
+
+class WeekViewWrapperState extends State<WeekViewWrapper> {
+  Key _weekViewKey = UniqueKey();
+  
+  void resetToCurrentWeek() {
+    // 通过更换key来强制重建WeekViewScreen
+    setState(() {
+      _weekViewKey = UniqueKey();
+    });
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return WeekViewScreen(key: _weekViewKey);
+  }
+}
+
+// 日视图包装器，用于支持重置到今天
+class DayViewWrapper extends StatefulWidget {
+  const DayViewWrapper({super.key});
+
+  @override
+  State<DayViewWrapper> createState() => DayViewWrapperState();
+}
+
+class DayViewWrapperState extends State<DayViewWrapper> {
+  Key _dayViewKey = UniqueKey();
+  
+  void resetToToday() {
+    // 通过更换key来强制重建DayViewScreen
+    setState(() {
+      _dayViewKey = UniqueKey();
+    });
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return DayViewScreen(key: _dayViewKey);
   }
 }

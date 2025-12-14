@@ -66,6 +66,10 @@ class _CourseImportScreenState extends State<CourseImportScreen> {
     final existingCourses = scheduleProvider.courses;
     final hasExistingCourses = existingCourses.isNotEmpty;
 
+    // 检测重复课程
+    final duplicateCourses = scheduleProvider.findDuplicateCourses(result.courses!);
+    final hasDuplicates = duplicateCourses.isNotEmpty;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -80,8 +84,54 @@ class _CourseImportScreenState extends State<CourseImportScreen> {
               Text('当前第 ${result.currentWeek} 周'),
               Text('课程总数: ${result.totalCourses} 门'),
               
+              // 显示重复课程警告（优先显示）
+              if (hasDuplicates) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    border: Border.all(color: Colors.red.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber,
+                        color: Colors.red.shade700,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '检测到重复课程',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.red.shade700,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '发现 ${duplicateCourses.length} 门课程与现有课程重复（相同名称、时间、周次）。追加导入时将自动跳过重复课程。',
+                              style: TextStyle(
+                                color: Colors.red.shade700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              
               // 显示覆盖警告
-              if (hasExistingCourses) ...[
+              if (hasExistingCourses && !hasDuplicates) ...[
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -125,6 +175,36 @@ class _CourseImportScreenState extends State<CourseImportScreen> {
                   ),
                 ),
               ],
+
+              // 学期日期同步提示
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  border: Border.all(color: Colors.blue.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.sync,
+                      color: Colors.blue.shade700,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '导入时将自动同步学期开始日期，确保周次显示正确。',
+                        style: TextStyle(
+                          color: Colors.blue.shade700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               
               const SizedBox(height: 16),
               const Text('即将导入以下课程:', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -137,26 +217,56 @@ class _CourseImportScreenState extends State<CourseImportScreen> {
                     itemCount: result.courses!.length,
                     itemBuilder: (context, index) {
                       final course = result.courses![index];
+                      final isDuplicate = duplicateCourses.contains(course);
                       return Card(
                         margin: const EdgeInsets.symmetric(vertical: 2),
+                        color: isDuplicate ? Colors.red.shade50 : null,
                         child: ListTile(
                           dense: true,
                           leading: Container(
                             width: 12,
                             height: 12,
                             decoration: BoxDecoration(
-                              color: course.color,
+                              color: isDuplicate ? Colors.grey : course.color,
                               shape: BoxShape.circle,
                             ),
                           ),
-                          title: Text(
-                            course.name,
-                            style: const TextStyle(fontSize: 14),
+                          title: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  course.name,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: isDuplicate ? Colors.grey : null,
+                                    decoration: isDuplicate ? TextDecoration.lineThrough : null,
+                                  ),
+                                ),
+                              ),
+                              if (isDuplicate)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.shade100,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '重复',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.red.shade700,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                           subtitle: Text(
                             '${course.teacher ?? ''} | ${course.location ?? ''}\n'
                             '周${course.dayOfWeek} 第${course.classHours.join('-')}节',
-                            style: const TextStyle(fontSize: 12),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDuplicate ? Colors.grey : null,
+                            ),
                           ),
                         ),
                       );
@@ -174,7 +284,7 @@ class _CourseImportScreenState extends State<CourseImportScreen> {
           ),
           if (hasExistingCourses)
             TextButton(
-              onPressed: () => _showImportOptionsDialog(result),
+              onPressed: () => _showImportOptionsDialog(result, duplicateCourses),
               child: const Text('选择导入方式'),
             )
           else
@@ -187,23 +297,28 @@ class _CourseImportScreenState extends State<CourseImportScreen> {
     );
   }
 
-  void _showImportOptionsDialog(CourseImportResult result) {
+  void _showImportOptionsDialog(CourseImportResult result, List<dynamic> duplicateCourses) {
     Navigator.of(context).pop(); // 关闭预览对话框
+    
+    final hasDuplicates = duplicateCourses.isNotEmpty;
     
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('选择导入方式'),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('请选择如何处理现有课程：'),
-            SizedBox(height: 16),
+            const Text('请选择如何处理现有课程：'),
+            const SizedBox(height: 16),
             Text(
-              '• 追加导入：保留现有课程，添加新课程\n'
-              '• 覆盖导入：删除所有现有课程，只保留导入的课程',
-              style: TextStyle(fontSize: 14),
+              hasDuplicates 
+                ? '• 追加导入：保留现有课程，添加新课程（自动跳过 ${duplicateCourses.length} 门重复课程）\n'
+                  '• 覆盖导入：删除所有现有课程，只保留导入的课程'
+                : '• 追加导入：保留现有课程，添加新课程\n'
+                  '• 覆盖导入：删除所有现有课程，只保留导入的课程',
+              style: const TextStyle(fontSize: 14),
             ),
           ],
         ),
@@ -217,7 +332,9 @@ class _CourseImportScreenState extends State<CourseImportScreen> {
               Navigator.of(context).pop();
               _confirmImport(result, false); // 追加导入
             },
-            child: const Text('追加导入'),
+            child: Text(hasDuplicates 
+              ? '追加导入 (跳过重复)' 
+              : '追加导入'),
           ),
           ElevatedButton(
             onPressed: () {
@@ -269,19 +386,44 @@ class _CourseImportScreenState extends State<CourseImportScreen> {
     try {
       final scheduleProvider = Provider.of<ScheduleProvider>(context, listen: false);
       
+      // 【修复 #4】同步学期开始日期
+      if (result.semesterStartDate != null) {
+        try {
+          final startDate = DateTime.parse(result.semesterStartDate!);
+          await scheduleProvider.updateCurrentScheduleStartDate(startDate);
+        } catch (e) {
+          debugPrint('同步学期日期失败: $e');
+          // 日期同步失败不影响课程导入
+        }
+      }
+      
+      int importedCount;
+      String message;
+      
       if (overwrite) {
-        // 覆盖导入：先清空再导入
+        // 覆盖导入：先清空再导入所有课程
         await scheduleProvider.overwriteCoursesBatch(result.courses!);
+        importedCount = result.courses!.length;
+        message = '成功覆盖导入 $importedCount 门课程';
       } else {
-        // 追加导入：直接添加新课程
-        await scheduleProvider.addCoursesBatch(result.courses!);
+        // 【修复 #5】追加导入：过滤重复课程后再添加
+        final nonDuplicateCourses = scheduleProvider.filterNonDuplicateCourses(result.courses!);
+        final skippedCount = result.courses!.length - nonDuplicateCourses.length;
+        
+        if (nonDuplicateCourses.isNotEmpty) {
+          await scheduleProvider.addCoursesBatch(nonDuplicateCourses);
+        }
+        
+        importedCount = nonDuplicateCourses.length;
+        
+        if (skippedCount > 0) {
+          message = '成功导入 $importedCount 门课程，跳过 $skippedCount 门重复课程';
+        } else {
+          message = '成功导入 $importedCount 门课程';
+        }
       }
 
       if (mounted) {
-        final message = overwrite 
-          ? '成功覆盖导入 ${result.courses!.length} 门课程'
-          : '成功导入 ${result.courses!.length} 门课程';
-          
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
@@ -460,4 +602,4 @@ class _CourseImportScreenState extends State<CourseImportScreen> {
       ),
     );
   }
-} 
+}

@@ -155,15 +155,40 @@ class ScheduleGridUtils {
   }
 
   /// 计算响应式尺寸
+  /// 确保课表完全填充可用空间
   static Map<String, double> calculateResponsiveSizes(double availableHeight, double availableWidth) {
-    final double classHourHeight = (availableHeight / 13).clamp(25.0, 60.0);
-    final double restHeight = (classHourHeight * 0.6).clamp(15.0, 30.0);
+    // 课表结构：11节课 + 2个休息时间
+    // 设 restHeight = classHourHeight * 0.55 (休息时间占课时高度的55%)
+    // 总高度 = 11 * classHourHeight + 2 * 0.55 * classHourHeight = 12.1 * classHourHeight
+    const double restRatio = 0.55;
+    const double totalUnits = 11 + 2 * restRatio; // 12.1
+    
+    // 计算基础课时高度
+    final double baseClassHourHeight = availableHeight / totalUnits;
+    
+    // 应用合理的限制范围，但允许更大的范围以适应屏幕
+    final double classHourHeight = baseClassHourHeight.clamp(20.0, 80.0);
+    final double restHeight = (classHourHeight * restRatio).clamp(12.0, 44.0);
+    
+    // 计算实际总高度
+    final double actualTotalHeight = 11 * classHourHeight + 2 * restHeight;
+    
+    // 如果有高度差异，按比例调整以完全填充
+    double finalClassHourHeight = classHourHeight;
+    double finalRestHeight = restHeight;
+    
+    if (actualTotalHeight < availableHeight) {
+      final double scaleFactor = availableHeight / actualTotalHeight;
+      finalClassHourHeight = classHourHeight * scaleFactor;
+      finalRestHeight = restHeight * scaleFactor;
+    }
+    
     final double timeColumnWidth = availableWidth < 400 ? 40.0 : 50.0;
     final double dayColumnWidth = (availableWidth - timeColumnWidth) / 7;
     
     return {
-      'classHourHeight': classHourHeight,
-      'restHeight': restHeight,
+      'classHourHeight': finalClassHourHeight,
+      'restHeight': finalRestHeight,
       'timeColumnWidth': timeColumnWidth,
       'dayColumnWidth': dayColumnWidth,
     };

@@ -15,14 +15,17 @@ class DayViewScreen extends StatefulWidget {
 
 class _DayViewScreenState extends State<DayViewScreen> {
   late PageController _pageController;
+  // 日视图独立管理选中的日期，不使用provider中的selectedDay
+  late int _selectedDayOfWeek;
 
   @override
   void initState() {
     super.initState();
-    final scheduleProvider = Provider.of<ScheduleProvider>(context, listen: false);
-    // 初始化PageController，默认显示当前选中的日期
+    // 默认显示今天
+    _selectedDayOfWeek = DateTime.now().weekday;
+    // 初始化PageController，默认显示今天
     _pageController = PageController(
-      initialPage: scheduleProvider.selectedDay - 1,
+      initialPage: _selectedDayOfWeek - 1,
     );
   }
 
@@ -35,12 +38,13 @@ class _DayViewScreenState extends State<DayViewScreen> {
   @override
   Widget build(BuildContext context) {
     final scheduleProvider = Provider.of<ScheduleProvider>(context);
-    final selectedWeek = scheduleProvider.selectedWeek;
-    final weekRange = scheduleProvider.getSelectedWeekRange();
+    // 使用当前实际周（currentWeek）而不是选中周（selectedWeek）
+    final currentWeek = scheduleProvider.currentWeek;
+    final weekRange = scheduleProvider.getCurrentWeekRange();
     
     if (weekRange == null) {
       return const Center(
-        child: Text('请先添加学期信息'),
+        child: Text('请先添加课表'),
       );
     }
 
@@ -49,19 +53,21 @@ class _DayViewScreenState extends State<DayViewScreen> {
     return Column(
       children: [
         // 日期选择器
-        _buildDateSelector(weekDates, scheduleProvider),
+        _buildDateSelector(weekDates, currentWeek),
         
         // 日视图
         Expanded(
           child: PageView.builder(
             controller: _pageController,
             onPageChanged: (index) {
-              scheduleProvider.setSelectedDay(index + 1);
+              setState(() {
+                _selectedDayOfWeek = index + 1;
+              });
             },
             itemCount: 7,
             itemBuilder: (context, index) {
               final dayOfWeek = index + 1; // 1-7, 对应周一到周日
-              return _buildDaySchedule(context, selectedWeek, dayOfWeek);
+              return _buildDaySchedule(context, currentWeek, dayOfWeek);
             },
           ),
         ),
@@ -70,9 +76,7 @@ class _DayViewScreenState extends State<DayViewScreen> {
   }
 
   // 构建日期选择器
-  Widget _buildDateSelector(List<DateTime> weekDates, ScheduleProvider scheduleProvider) {
-    final selectedDay = scheduleProvider.selectedDay;
-    
+  Widget _buildDateSelector(List<DateTime> weekDates, int currentWeek) {
     return Container(
       height: 60,
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -83,12 +87,14 @@ class _DayViewScreenState extends State<DayViewScreen> {
         itemBuilder: (context, index) {
           final dayOfWeek = index + 1; // 1-7, 对应周一到周日
           final date = weekDates[index];
-          final isSelected = selectedDay == dayOfWeek;
+          final isSelected = _selectedDayOfWeek == dayOfWeek;
           final isToday = _isToday(date);
           
           return GestureDetector(
             onTap: () {
-              scheduleProvider.setSelectedDay(dayOfWeek);
+              setState(() {
+                _selectedDayOfWeek = dayOfWeek;
+              });
               _pageController.animateToPage(
                 index,
                 duration: const Duration(milliseconds: 300),
@@ -405,4 +411,4 @@ class _DayViewScreenState extends State<DayViewScreen> {
     final now = DateTime.now();
     return date.year == now.year && date.month == now.month && date.day == now.day;
   }
-} 
+}
