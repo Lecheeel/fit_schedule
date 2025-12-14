@@ -78,13 +78,20 @@ jobs:
         name: release-apk
         path: build/app/outputs/flutter-apk/app-release.apk
         
+    - name: Get version from pubspec.yaml
+      id: get_version
+      run: |
+        VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "Extracted version: $VERSION"
+        
     - name: Create Release
       # 使用新的环境变量判断
       if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && env.HAS_KEYSTORE == 'true' }}
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: v${{ github.run_number }}
-        name: Release v${{ github.run_number }}
+        tag_name: v${{ steps.get_version.outputs.VERSION }}
+        name: Release v${{ steps.get_version.outputs.VERSION }}
         files: build/app/outputs/flutter-apk/app-release.apk
         generate_release_notes: true
       env:
