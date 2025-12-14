@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/course.dart';
 import '../providers/schedule_provider.dart';
-import 'conflicting_courses_sheet.dart';
 import 'time_slot_courses_sheet.dart';
 import 'schedule_grid/schedule_background_grid.dart';
 import 'schedule_grid/schedule_course_cards_layer.dart';
@@ -105,16 +104,6 @@ class WeekScheduleGrid extends StatelessWidget {
       arguments: course,
     );
   }
-  
-  /// 显示冲突的课程
-  void _showConflictingCourses(BuildContext context, List<Course> courses, int currentWeek) {
-    ConflictingCoursesSheet.show(
-      context,
-      courses: courses,
-      currentWeek: currentWeek,
-      onCourseTap: (course) => _showCourseDetail(context, course),
-    );
-  }
 
   /// 显示时间槽课程
   void _showTimeSlotCourses(BuildContext context, List<Course> timeSlotCourses, int dayOfWeek, List<int> classHours) {
@@ -127,4 +116,4 @@ class WeekScheduleGrid extends StatelessWidget {
       onCourseTap: (course) => _showCourseDetail(context, course),
     );
   }
-} 
+}
