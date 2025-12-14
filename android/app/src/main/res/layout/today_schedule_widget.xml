@@ -32,26 +32,30 @@
 
     </LinearLayout>
 
-    <!-- 课程列表容器 -->
-    <LinearLayout
-        android:id="@+id/courses_container"
+    <!-- 无课程提示 -->
+    <TextView
+        android:id="@+id/no_courses_text"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:orientation="vertical">
+        android:text="今日无课程安排"
+        android:textColor="#666666"
+        android:textSize="13sp"
+        android:gravity="start|top"
+        android:paddingTop="4dp"
+        android:visibility="gone" />
 
-        <!-- 默认显示无课程信息 -->
-        <TextView
-            android:id="@+id/no_courses_text"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:text="今日无课程安排"
-            android:textColor="#999999"
-            android:textSize="12sp"
-            android:gravity="center"
-            android:visibility="visible" />
-
-    </LinearLayout>
+    <!-- 可滚动的课程列表 -->
+    <ListView
+        android:id="@+id/courses_list_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@null"
+        android:dividerHeight="0dp"
+        android:scrollbars="vertical"
+        android:fadeScrollbars="false"
+        android:scrollbarStyle="outsideOverlay" />
 
     <!-- 底部：点击打开应用提示 -->
     <TextView

@@ -46,75 +46,56 @@ class TodayScheduleWidgetProvider : AppWidgetProvider() {
             val currentDate = dateFormat.format(Date())
             views.setTextViewText(R.id.widget_date, currentDate)
 
-            // 设置点击事件 - 点击桌面组件打开应用
-            val intent = Intent(context, MainActivity::class.java)
-            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            val pendingIntent = PendingIntent.getActivity(
-                context, 
-                0, 
-                intent, 
+            // 设置ListView的数据适配器
+            val serviceIntent = Intent(context, WidgetRemoteViewsService::class.java)
+            serviceIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            views.setRemoteAdapter(R.id.courses_list_view, serviceIntent)
+
+            // 设置空视图（当ListView为空时显示）
+            views.setEmptyView(R.id.courses_list_view, R.id.no_courses_text)
+
+            // 设置ListView的点击事件模板
+            val clickIntent = Intent(context, MainActivity::class.java)
+            clickIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            val clickPendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                clickIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            views.setOnClickPendingIntent(R.id.courses_container, pendingIntent)
+            views.setPendingIntentTemplate(R.id.courses_list_view, clickPendingIntent)
 
-            // 加载今日课程数据
-            loadTodayCourses(context, views)
+            // 检查是否有课程，控制显示
+            checkAndDisplayCourses(context, views)
 
             // 更新桌面组件
             appWidgetManager.updateAppWidget(appWidgetId, views)
+            
+            // 通知ListView数据已更改
+            appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.courses_list_view)
         }
 
-        private fun loadTodayCourses(context: Context, views: RemoteViews) {
+        private fun checkAndDisplayCourses(context: Context, views: RemoteViews) {
             try {
-                // 使用数据库助手获取今日课程
+                // 检查今日是否有课程
                 val databaseHelper = WidgetDatabaseHelper(context)
                 val todayCourses = databaseHelper.getTodayCourses()
                 
                 if (todayCourses.isEmpty()) {
-                    // 显示无课程信息
-                    views.setTextViewText(R.id.no_courses_text, "今日无课程安排")
+                    // 显示无课程提示
                     views.setViewVisibility(R.id.no_courses_text, android.view.View.VISIBLE)
+                    views.setViewVisibility(R.id.courses_list_view, android.view.View.GONE)
                 } else {
-                    // 隐藏无课程文本
-                    views.setViewVisibility(R.id.no_courses_text, android.view.View.GONE)
-                    
                     // 显示课程列表
-                    displayCourses(views, todayCourses)
+                    views.setViewVisibility(R.id.no_courses_text, android.view.View.GONE)
+                    views.setViewVisibility(R.id.courses_list_view, android.view.View.VISIBLE)
                 }
             } catch (e: Exception) {
                 // 错误处理 - 显示错误信息
                 views.setTextViewText(R.id.no_courses_text, "加载课程失败")
                 views.setViewVisibility(R.id.no_courses_text, android.view.View.VISIBLE)
+                views.setViewVisibility(R.id.courses_list_view, android.view.View.GONE)
             }
-        }
-
-        private fun displayCourses(views: RemoteViews, courses: List<WidgetDatabaseHelper.CourseInfo>) {
-            // 由于RemoteViews的限制，我们只能显示有限的课程信息
-            // 这里将前几门课程的信息组合成一个字符串显示
-            
-            val displayText = StringBuilder()
-            val maxCourses = minOf(courses.size, 3) // 最多显示3门课程
-            
-            for (i in 0 until maxCourses) {
-                val course = courses[i]
-                if (i > 0) displayText.append("\n\n")
-                
-                displayText.append("📚 ${course.name}")
-                if (course.time.isNotEmpty()) {
-                    displayText.append("\n⏰ ${course.time}")
-                }
-                if (course.location.isNotEmpty()) {
-                    displayText.append("\n📍 ${course.location}")
-                }
-            }
-            
-            // 如果还有更多课程，显示提示
-            if (courses.size > maxCourses) {
-                displayText.append("\n\n还有 ${courses.size - maxCourses} 门课程...")
-            }
-            
-            views.setTextViewText(R.id.no_courses_text, displayText.toString())
-            views.setViewVisibility(R.id.no_courses_text, android.view.View.VISIBLE)
         }
 
         /**

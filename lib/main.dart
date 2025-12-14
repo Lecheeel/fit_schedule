@@ -4,13 +4,19 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'providers/schedule_provider.dart';
+import 'services/notification_service.dart';
 import 'screens/week_view_screen.dart';
 import 'screens/day_view_screen.dart';
 import 'screens/course_management_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/course_form_screen.dart';
+import 'screens/course_import_screen.dart';
+import 'screens/semester_management_screen.dart';
 import 'utils/app_theme.dart';
 import 'models/course.dart';
+
+// 全局导航key，用于通知点击时导航
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +29,10 @@ void main() async {
     systemNavigationBarDividerColor: Colors.transparent, // 导航栏分隔线
     systemNavigationBarIconBrightness: Brightness.dark, // 导航栏图标颜色
   ));
+  
+  // 初始化通知服务
+  final notificationService = NotificationService();
+  await notificationService.init();
   
   // 初始化ScheduleProvider
   final scheduleProvider = ScheduleProvider();
@@ -55,10 +65,14 @@ class MyApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
       home: const HomePage(),
+      navigatorKey: navigatorKey, // 添加全局导航key
       debugShowCheckedModeBanner: false, // 移除debug标签
       // 添加命名路由
       routes: {
         '/course-form': (context) => CourseFormScreen(),
+        '/course_import': (context) => const CourseImportScreen(),
+        '/course_management': (context) => const CourseManagementScreen(),
+        '/semester_management': (context) => const SemesterManagementScreen(),
       },
       // 添加路由生成器，处理需要传参的路由
       onGenerateRoute: (settings) {

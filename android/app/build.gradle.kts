@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "com.example.fit_schedule"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "27.0.12077973"
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -29,6 +29,11 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        // 只支持 arm64-v8a 架构，减小APK大小
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
     }
 
     signingConfigs {
@@ -48,7 +53,10 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+            // 启用代码压缩
             isMinifyEnabled = true
+            // 启用资源压缩
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

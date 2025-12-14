@@ -22,11 +22,9 @@ FITschedule 是一个基于 Flutter 的大学课表管理应用，专注于**安
 
 ## 开发约定
 - 所有UI文本使用中文
-- 代码注释使用中文
 - Git提交信息使用英文
 - 优先考虑安卓平台的用户体验
 - 响应式设计，适配不同安卓设备尺寸
-- 创建文件夹与文件可以使用MCP tool, 但文件内容请不要用MCP tool
 
 ## 关键数据结构
 课程模型 [Course](mdc:lib/models/course.dart) 包含：

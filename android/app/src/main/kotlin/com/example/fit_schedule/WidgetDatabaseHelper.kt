@@ -10,7 +10,7 @@ import java.util.*
 class WidgetDatabaseHelper(private val context: Context) {
 
     companion object {
-        private const val DATABASE_NAME = "schedule_database.db"
+        private const val DATABASE_NAME = "fit_schedule.db"
     }
 
     /**
@@ -18,14 +18,24 @@ class WidgetDatabaseHelper(private val context: Context) {
      */
     fun getTodayCourses(): List<CourseInfo> {
         return try {
+            // 获取当前日期和周次
+            val dayOfWeek = getCurrentDayOfWeek()
+            val currentWeek = getCurrentWeek()
+            
+            android.util.Log.d("WidgetDebug", "Today: dayOfWeek=$dayOfWeek, week=$currentWeek")
+            
             val database = openFlutterDatabase()
             if (database != null) {
-                getCoursesByDay(database, getCurrentDayOfWeek(), getCurrentWeek())
+                val courses = getCoursesByDay(database, dayOfWeek, currentWeek)
+                android.util.Log.d("WidgetDebug", "Found ${courses.size} courses")
+                courses
             } else {
+                android.util.Log.e("WidgetDebug", "Database is null")
                 emptyList()
             }
         } catch (e: Exception) {
             // 如果读取数据库失败，返回空列表
+            android.util.Log.e("WidgetDebug", "Error loading courses: ${e.message}")
             emptyList()
         }
     }
@@ -38,16 +48,23 @@ class WidgetDatabaseHelper(private val context: Context) {
             // Flutter应用的数据库通常存储在应用的数据目录下
             val databasePath = File(context.getDatabasePath(DATABASE_NAME).absolutePath)
             
+            android.util.Log.d("WidgetDebug", "Database path: ${databasePath.absolutePath}")
+            android.util.Log.d("WidgetDebug", "Database exists: ${databasePath.exists()}")
+            
             if (databasePath.exists()) {
-                SQLiteDatabase.openDatabase(
+                val db = SQLiteDatabase.openDatabase(
                     databasePath.absolutePath,
                     null,
                     SQLiteDatabase.OPEN_READONLY
                 )
+                android.util.Log.d("WidgetDebug", "Database opened successfully")
+                db
             } else {
+                android.util.Log.e("WidgetDebug", "Database file not found")
                 null
             }
         } catch (e: SQLiteException) {
+            android.util.Log.e("WidgetDebug", "Failed to open database: ${e.message}")
             null
         }
     }
@@ -163,12 +180,41 @@ class WidgetDatabaseHelper(private val context: Context) {
     }
 
     /**
-     * 获取当前周次（简化实现，实际应该从学期设置中计算）
+     * 获取当前周次（从数据库读取学期信息并计算）
      */
     private fun getCurrentWeek(): Int {
-        // 这里简化处理，返回一个固定的周次
-        // 实际应该从数据库中读取当前学期信息并计算当前周次
-        return 1
+        return try {
+            val database = openFlutterDatabase()
+            if (database != null) {
+                // 查询当前活动学期
+                val cursor = database.rawQuery(
+                    "SELECT startDate, numberOfWeeks FROM semesters WHERE isActive = 1",
+                    null
+                )
+                
+                cursor.use {
+                    if (it.moveToFirst()) {
+                        val startDateStr = it.getString(0)
+                        val numberOfWeeks = it.getInt(1)
+                        
+                        // 解析开始日期并计算当前周次
+                        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                        val startDate = sdf.parse(startDateStr)
+                        
+                        if (startDate != null) {
+                            val now = Date()
+                            val diff = now.time - startDate.time
+                            val weeks = (diff / (1000 * 60 * 60 * 24 * 7)).toInt() + 1
+                            
+                            return if (weeks in 1..numberOfWeeks) weeks else 1
+                        }
+                    }
+                }
+            }
+            1 // 默认返回第1周
+        } catch (e: Exception) {
+            1 // 出错时返回第1周
+        }
     }
 
     /**
