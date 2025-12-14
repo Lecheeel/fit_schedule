@@ -20,13 +20,22 @@ class WidgetDatabaseHelper(private val context: Context) {
         return try {
             // 获取当前日期和周次
             val dayOfWeek = getCurrentDayOfWeek()
-            val currentWeek = getCurrentWeek()
+            val scheduleInfo = getActiveScheduleInfo()
             
-            android.util.Log.d("WidgetDebug", "Today: dayOfWeek=$dayOfWeek, week=$currentWeek")
+            if (scheduleInfo == null) {
+                android.util.Log.w("WidgetDebug", "No active schedule found")
+                return emptyList()
+            }
+            
+            val currentWeek = scheduleInfo.currentWeek
+            val scheduleId = scheduleInfo.scheduleId
+            
+            android.util.Log.d("WidgetDebug", "Today: dayOfWeek=$dayOfWeek, week=$currentWeek, scheduleId=$scheduleId")
             
             val database = openFlutterDatabase()
             if (database != null) {
-                val courses = getCoursesByDay(database, dayOfWeek, currentWeek)
+                val courses = getCoursesByDay(database, dayOfWeek, currentWeek, scheduleId)
+                database.close()
                 android.util.Log.d("WidgetDebug", "Found ${courses.size} courses")
                 courses
             } else {
@@ -70,21 +79,87 @@ class WidgetDatabaseHelper(private val context: Context) {
     }
 
     /**
-     * 从数据库中查询指定日期和周次的课程
+     * 活动课表信息数据类
      */
-    private fun getCoursesByDay(database: SQLiteDatabase, dayOfWeek: Int, currentWeek: Int): List<CourseInfo> {
+    private data class ScheduleInfo(
+        val scheduleId: Int,
+        val currentWeek: Int
+    )
+    
+    /**
+     * 获取当前活动课表信息（ID和当前周次）
+     */
+    private fun getActiveScheduleInfo(): ScheduleInfo? {
+        return try {
+            val database = openFlutterDatabase()
+            if (database != null) {
+                // 查询当前活动课表（数据库已从semesters迁移到schedules表）
+                val cursor = database.rawQuery(
+                    "SELECT id, startDate, numberOfWeeks FROM schedules WHERE isActive = 1",
+                    null
+                )
+                
+                cursor.use {
+                    if (it.moveToFirst()) {
+                        val scheduleId = it.getInt(0)
+                        val startDateStr = it.getString(1)
+                        val numberOfWeeks = it.getInt(2)
+                        
+                        android.util.Log.d("WidgetDebug", "Schedule found: id=$scheduleId, startDate=$startDateStr, numberOfWeeks=$numberOfWeeks")
+                        
+                        // 解析开始日期并计算当前周次
+                        val startDate = parseDate(startDateStr)
+                        
+                        val currentWeek = if (startDate != null) {
+                            val now = Date()
+                            val diff = now.time - startDate.time
+                            val weeks = (diff / (1000 * 60 * 60 * 24 * 7)).toInt() + 1
+                            
+                            android.util.Log.d("WidgetDebug", "Calculated current week: $weeks")
+                            
+                            // 如果周次超出范围，返回边界值
+                            when {
+                                weeks < 1 -> 1
+                                weeks > numberOfWeeks -> numberOfWeeks
+                                else -> weeks
+                            }
+                        } else {
+                            1
+                        }
+                        
+                        database.close()
+                        return ScheduleInfo(scheduleId, currentWeek)
+                    } else {
+                        android.util.Log.w("WidgetDebug", "No active schedule found in database")
+                    }
+                }
+                database.close()
+            }
+            null
+        } catch (e: Exception) {
+            android.util.Log.e("WidgetDebug", "Error getting active schedule info: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * 从数据库中查询指定日期、周次和课表的课程
+     */
+    private fun getCoursesByDay(database: SQLiteDatabase, dayOfWeek: Int, currentWeek: Int, scheduleId: Int): List<CourseInfo> {
         val courses = mutableListOf<CourseInfo>()
         
         try {
-            // 查询课程表，假设表名为 courses
+            // 查询指定课表和星期几的课程
             val cursor = database.rawQuery(
                 """
                 SELECT name, teacher, location, color, classHours, weeks 
                 FROM courses 
-                WHERE dayOfWeek = ?
+                WHERE dayOfWeek = ? AND scheduleId = ?
                 """.trimIndent(),
-                arrayOf(dayOfWeek.toString())
+                arrayOf(dayOfWeek.toString(), scheduleId.toString())
             )
+
+            android.util.Log.d("WidgetDebug", "Query: dayOfWeek=$dayOfWeek, scheduleId=$scheduleId, currentWeek=$currentWeek")
 
             cursor.use {
                 while (it.moveToNext()) {
@@ -98,6 +173,8 @@ class WidgetDatabaseHelper(private val context: Context) {
                     val classHours = parseJsonIntArray(classHoursJson)
                     val weeks = parseJsonIntArray(weeksJson)
 
+                    android.util.Log.d("WidgetDebug", "Course: $name, weeks=$weeks, classHours=$classHours")
+
                     // 检查当前周是否在上课周次内
                     if (weeks.contains(currentWeek) && classHours.isNotEmpty()) {
                         val timeRange = getTimeRangeFromClassHours(classHours)
@@ -109,11 +186,14 @@ class WidgetDatabaseHelper(private val context: Context) {
                                 teacher = teacher
                             )
                         )
+                        android.util.Log.d("WidgetDebug", "Added course: $name (week $currentWeek is in $weeks)")
+                    } else {
+                        android.util.Log.d("WidgetDebug", "Skipped course: $name (week $currentWeek not in $weeks)")
                     }
                 }
             }
         } catch (e: Exception) {
-            // 查询失败时返回空列表
+            android.util.Log.e("WidgetDebug", "Error querying courses: ${e.message}")
         }
 
         // 按时间排序
@@ -180,41 +260,25 @@ class WidgetDatabaseHelper(private val context: Context) {
     }
 
     /**
-     * 获取当前周次（从数据库读取学期信息并计算）
+     * 解析日期字符串，支持多种格式
      */
-    private fun getCurrentWeek(): Int {
-        return try {
-            val database = openFlutterDatabase()
-            if (database != null) {
-                // 查询当前活动学期
-                val cursor = database.rawQuery(
-                    "SELECT startDate, numberOfWeeks FROM semesters WHERE isActive = 1",
-                    null
-                )
-                
-                cursor.use {
-                    if (it.moveToFirst()) {
-                        val startDateStr = it.getString(0)
-                        val numberOfWeeks = it.getInt(1)
-                        
-                        // 解析开始日期并计算当前周次
-                        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                        val startDate = sdf.parse(startDateStr)
-                        
-                        if (startDate != null) {
-                            val now = Date()
-                            val diff = now.time - startDate.time
-                            val weeks = (diff / (1000 * 60 * 60 * 24 * 7)).toInt() + 1
-                            
-                            return if (weeks in 1..numberOfWeeks) weeks else 1
-                        }
-                    }
-                }
+    private fun parseDate(dateStr: String): Date? {
+        // 尝试ISO格式 (yyyy-MM-ddTHH:mm:ss.SSSZ 或类似)
+        val isoFormats = listOf(
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.getDefault()),
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()),
+            SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        )
+        
+        for (format in isoFormats) {
+            try {
+                return format.parse(dateStr.split("Z")[0].split("+")[0])
+            } catch (e: Exception) {
+                // 继续尝试下一个格式
             }
-            1 // 默认返回第1周
-        } catch (e: Exception) {
-            1 // 出错时返回第1周
         }
+        
+        return null
     }
 
     /**
@@ -226,4 +290,4 @@ class WidgetDatabaseHelper(private val context: Context) {
         val location: String,
         val teacher: String = ""
     )
-} 
+}
