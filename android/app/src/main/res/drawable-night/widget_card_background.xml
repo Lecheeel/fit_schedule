@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    
+    <!-- 深色模式卡片背景 -->
+    <solid android:color="#2A2A3C" />
+    
+    <!-- 圆角 -->
+    <corners android:radius="12dp" />
+    
+</shape>

@@ -3,68 +3,103 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
-    android:orientation="vertical"
-    android:padding="8dp">
+    android:orientation="vertical">
 
-    <!-- 头部：日期和标题 -->
+    <!-- 头部区域：紧凑一行 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="@drawable/widget_header_background"
         android:orientation="horizontal"
-        android:layout_marginBottom="4dp">
+        android:gravity="center_vertical"
+        android:padding="10dp">
 
+        <!-- 日期（周几） -->
         <TextView
             android:id="@+id/widget_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="周一"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <!-- 分隔点 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=" · "
+            android:textColor="#CCCCFF"
+            android:textSize="14sp" />
+
+        <!-- 课程数量 -->
+        <TextView
+            android:id="@+id/widget_summary"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="今日课程"
-            android:textColor="#333333"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:text="3节课"
+            android:textColor="#E8E8FF"
+            android:textSize="14sp" />
 
-        <ImageView
-            android:layout_width="16dp"
-            android:layout_height="16dp"
-            android:src="@drawable/ic_schedule"
-            android:layout_gravity="center_vertical"
-            android:tint="#666666" />
+        <!-- 周次 -->
+        <TextView
+            android:id="@+id/widget_week"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="第15周"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:background="@drawable/widget_week_badge"
+            android:paddingLeft="8dp"
+            android:paddingRight="8dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp" />
 
     </LinearLayout>
 
-    <!-- 无课程提示 -->
-    <TextView
-        android:id="@+id/no_courses_text"
+    <!-- 内容区域 -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:text="今日无课程安排"
-        android:textColor="#666666"
-        android:textSize="13sp"
-        android:gravity="start|top"
-        android:paddingTop="4dp"
-        android:visibility="gone" />
+        android:padding="6dp">
 
-    <!-- 可滚动的课程列表 -->
-    <ListView
-        android:id="@+id/courses_list_view"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:divider="@null"
-        android:dividerHeight="0dp"
-        android:scrollbars="vertical"
-        android:fadeScrollbars="false"
-        android:scrollbarStyle="outsideOverlay" />
+        <!-- 无课程提示 -->
+        <LinearLayout
+            android:id="@+id/no_courses_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:visibility="gone">
 
-    <!-- 底部：点击打开应用提示 -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="点击打开课程表"
-        android:textColor="#666666"
-        android:textSize="10sp"
-        android:gravity="center"
-        android:layout_marginTop="2dp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🎉"
+                android:textSize="28sp" />
 
-</LinearLayout> 
+            <TextView
+                android:id="@+id/no_courses_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="今日无课程"
+                android:textColor="#666666"
+                android:textSize="13sp"
+                android:layout_marginTop="6dp" />
+
+        </LinearLayout>
+
+        <!-- 可滚动的课程列表 -->
+        <ListView
+            android:id="@+id/courses_list_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:divider="@null"
+            android:dividerHeight="4dp"
+            android:scrollbars="none" />
+
+    </FrameLayout>
+
+</LinearLayout>

@@ -2,6 +2,7 @@ package com.example.fit_schedule
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.GradientDrawable
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 
@@ -31,7 +32,9 @@ class WidgetRemoteViewsFactory(private val context: Context) : RemoteViewsServic
         // 这里从数据库加载今日课程
         try {
             courses = databaseHelper.getTodayCourses()
+            android.util.Log.d("WidgetDebug", "RemoteViewsFactory loaded ${courses.size} courses")
         } catch (e: Exception) {
+            android.util.Log.e("WidgetDebug", "Error loading courses in factory: ${e.message}")
             courses = emptyList()
         }
     }
@@ -53,11 +56,11 @@ class WidgetRemoteViewsFactory(private val context: Context) : RemoteViewsServic
             val course = courses[position]
             
             // 设置课程名称
-            views.setTextViewText(R.id.course_name, "📚 ${course.name}")
+            views.setTextViewText(R.id.course_name, course.name)
             
             // 设置时间
             if (course.time.isNotEmpty()) {
-                views.setTextViewText(R.id.course_time, "⏰ ${course.time}")
+                views.setTextViewText(R.id.course_time, course.time)
                 views.setViewVisibility(R.id.course_time, android.view.View.VISIBLE)
             } else {
                 views.setViewVisibility(R.id.course_time, android.view.View.GONE)
@@ -70,11 +73,21 @@ class WidgetRemoteViewsFactory(private val context: Context) : RemoteViewsServic
             } else {
                 views.setViewVisibility(R.id.course_location, android.view.View.GONE)
             }
-            
-            // 设置点击事件 - 点击单个课程项也打开应用
+
+            // 设置教师
+            if (course.teacher.isNotEmpty()) {
+                views.setTextViewText(R.id.course_teacher, "👤 ${course.teacher}")
+                views.setViewVisibility(R.id.course_teacher, android.view.View.VISIBLE)
+            } else {
+                views.setViewVisibility(R.id.course_teacher, android.view.View.GONE)
+            }
+
+            // 设置点击事件 - 点击整个课程项打开应用
             val fillInIntent = Intent()
             fillInIntent.putExtra("course_name", course.name)
             views.setOnClickFillInIntent(R.id.course_name, fillInIntent)
+            
+            android.util.Log.d("WidgetDebug", "getViewAt($position): ${course.name}")
         }
         
         return views
@@ -98,4 +111,3 @@ class WidgetRemoteViewsFactory(private val context: Context) : RemoteViewsServic
         return true
     }
 }
-

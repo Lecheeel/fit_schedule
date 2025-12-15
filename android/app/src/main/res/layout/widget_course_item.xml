@@ -3,38 +3,47 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="8dp"
-    android:background="#F5F5F5"
-    android:layout_marginBottom="4dp">
+    android:background="#FFFFFF"
+    android:padding="8dp">
 
     <!-- 课程名称 -->
     <TextView
         android:id="@+id/course_name"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="课程名称"
+        android:text="高等数学"
         android:textColor="#333333"
         android:textSize="14sp"
-        android:textStyle="bold"
-        android:paddingBottom="2dp" />
+        android:textStyle="bold" />
 
     <!-- 时间 -->
     <TextView
         android:id="@+id/course_time"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="⏰ 08:00-09:40"
+        android:text="08:30-10:05"
         android:textColor="#666666"
         android:textSize="12sp"
-        android:paddingBottom="2dp" />
+        android:paddingTop="2dp" />
 
     <!-- 地点 -->
     <TextView
         android:id="@+id/course_location"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="📍 教学楼"
-        android:textColor="#666666"
-        android:textSize="12sp" />
+        android:text="📍 教学楼A101"
+        android:textColor="#888888"
+        android:textSize="11sp"
+        android:paddingTop="2dp" />
+
+    <!-- 教师 -->
+    <TextView
+        android:id="@+id/course_teacher"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="👤 张老师"
+        android:textColor="#888888"
+        android:textSize="11sp"
+        android:paddingTop="2dp" />
 
 </LinearLayout>

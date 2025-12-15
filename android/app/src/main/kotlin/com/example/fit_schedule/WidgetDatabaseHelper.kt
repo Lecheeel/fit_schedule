@@ -166,6 +166,7 @@ class WidgetDatabaseHelper(private val context: Context) {
                     val name = it.getString(0) ?: ""
                     val teacher = it.getString(1) ?: ""
                     val location = it.getString(2) ?: ""
+                    val colorValue = it.getInt(3)
                     val classHoursJson = it.getString(4) ?: "[]"
                     val weeksJson = it.getString(5) ?: "[]"
 
@@ -173,17 +174,20 @@ class WidgetDatabaseHelper(private val context: Context) {
                     val classHours = parseJsonIntArray(classHoursJson)
                     val weeks = parseJsonIntArray(weeksJson)
 
-                    android.util.Log.d("WidgetDebug", "Course: $name, weeks=$weeks, classHours=$classHours")
+                    android.util.Log.d("WidgetDebug", "Course: $name, weeks=$weeks, classHours=$classHours, color=$colorValue")
 
                     // 检查当前周是否在上课周次内
                     if (weeks.contains(currentWeek) && classHours.isNotEmpty()) {
                         val timeRange = getTimeRangeFromClassHours(classHours)
+                        // 确保颜色值有效，如果无效则使用默认颜色
+                        val finalColor = if (colorValue != 0) colorValue else 0xFF667eea.toInt()
                         courses.add(
                             CourseInfo(
                                 name = name,
                                 time = timeRange,
                                 location = location,
-                                teacher = teacher
+                                teacher = teacher,
+                                color = finalColor
                             )
                         )
                         android.util.Log.d("WidgetDebug", "Added course: $name (week $currentWeek is in $weeks)")
@@ -282,12 +286,31 @@ class WidgetDatabaseHelper(private val context: Context) {
     }
 
     /**
+     * 课表摘要信息
+     */
+    data class ScheduleSummary(
+        val currentWeek: Int,
+        val courseCount: Int
+    )
+
+    /**
+     * 获取课表摘要信息
+     */
+    fun getScheduleSummary(): ScheduleSummary {
+        val scheduleInfo = getActiveScheduleInfo()
+        val currentWeek = scheduleInfo?.currentWeek ?: 1
+        val courses = getTodayCourses()
+        return ScheduleSummary(currentWeek, courses.size)
+    }
+
+    /**
      * 课程信息数据类
      */
     data class CourseInfo(
         val name: String,
         val time: String,
         val location: String,
-        val teacher: String = ""
+        val teacher: String = "",
+        val color: Int = 0xFF667eea.toInt()
     )
 }
