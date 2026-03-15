@@ -23,10 +23,10 @@ class _CourseImportScreenState extends State<CourseImportScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSavedAccount();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSavedAccount());
   }
 
-  Future<void> _loadSavedAccount() async {
+  void _loadSavedAccount() {
     final provider = Provider.of<ScheduleProvider>(context, listen: false);
     final account = provider.getAccountForCurrentSchedule();
     if (account != null) {
@@ -435,20 +435,12 @@ class _CourseImportScreenState extends State<CourseImportScreen> {
         }
       }
 
-      int importedCount;
+      final importedCount = result.courses!.length;
       String message;
       if (overwrite) {
-        importedCount = result.courses!.length;
         message = '成功覆盖导入 $importedCount 门课程';
       } else {
-        final nonDuplicateCourses = scheduleProvider.filterNonDuplicateCourses(result.courses!);
-        final skippedCount = result.courses!.length - nonDuplicateCourses.length;
-        importedCount = result.courses!.length - skippedCount;
-        if (skippedCount > 0) {
-          message = '成功导入 $importedCount 门课程，跳过 $skippedCount 门重复课程';
-        } else {
-          message = '成功导入 $importedCount 门课程';
-        }
+        message = '成功导入 $importedCount 门课程';
       }
 
       if (_saveAccount) {
