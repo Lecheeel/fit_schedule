@@ -556,6 +556,7 @@ class ScheduleProvider extends ChangeNotifier {
     final result = await CourseImportService.getFullSchedule(
       account.username,
       account.password,
+      forceUpdate: true,
     );
 
     if (!result.success) {

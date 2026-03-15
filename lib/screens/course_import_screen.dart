@@ -57,6 +57,7 @@ class _CourseImportScreenState extends State<CourseImportScreen> {
       final result = await CourseImportService.getFullSchedule(
         _usernameController.text.trim(),
         _passwordController.text,
+        forceUpdate: true,
       );
 
       if (!mounted) return;
