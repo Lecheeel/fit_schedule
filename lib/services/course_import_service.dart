@@ -9,7 +9,12 @@ class CourseImportService {
   static const String _baseUrl = 'http://106.15.72.24:8072';
   
   /// 获取完整学期课表
-  static Future<CourseImportResult> getFullSchedule(String username, String password) async {
+  /// [forceUpdate] 为 true 时强制服务器重新抓取最新课表，否则可能返回缓存数据
+  static Future<CourseImportResult> getFullSchedule(
+    String username,
+    String password, {
+    bool forceUpdate = false,
+  }) async {
     try {
       final url = Uri.parse('$_baseUrl/get_courses');
       final headers = {'Content-Type': 'application/json'};
@@ -18,6 +23,7 @@ class CourseImportService {
         'password': password,
         'action': 'full_schedule',
         'relogin': false,
+        'force_update': forceUpdate,
       };
 
       final response = await http.post(

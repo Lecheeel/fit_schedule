@@ -14,6 +14,7 @@ import '../widgets/settings_dialogs/reminder_dialog.dart';
 import '../widgets/settings_dialogs/about_dialog.dart';
 import '../widgets/settings_dialogs/developer_easter_egg_dialog.dart';
 import '../widgets/settings_dialogs/system_info_dialog.dart';
+import 'account_management_screen.dart';
 import 'schedule_management_screen.dart';
 import 'course_import_screen.dart';
 
@@ -81,6 +82,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onCreateSmartSchedule: () => _createSmartScheduleAndImport(context),
           ),
 
+          // 账号管理
+          _buildAccountSection(scheduleProvider),
+
           // 课表显示设置
           _buildScheduleDisplaySection(scheduleProvider),
 
@@ -133,7 +137,99 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // 构建课表显示设置区块
+  Widget _buildAccountSection(ScheduleProvider scheduleProvider) {
+    final accountCount = scheduleProvider.accounts.length;
+    final currentAccount = scheduleProvider.getAccountForCurrentSchedule();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Text(
+            '账号管理',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ),
+        ListTile(
+          leading: const Icon(Icons.manage_accounts),
+          title: const Text('教务系统账号'),
+          subtitle: Text(
+            accountCount > 0 ? '已保存 $accountCount 个账号' : '未保存账号',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _navigateToAccountManagement(context),
+        ),
+        if (currentAccount != null)
+          ListTile(
+            leading: const Icon(Icons.sync),
+            title: const Text('快速更新课表'),
+            subtitle: Text('使用 ${currentAccount.displayName} 的账号更新'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _quickSync(context, currentAccount, scheduleProvider),
+          ),
+        const Divider(),
+      ],
+    );
+  }
+
+  void _navigateToAccountManagement(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AccountManagementScreen(),
+      ),
+    );
+  }
+
+  Future<void> _quickSync(
+    BuildContext context,
+    dynamic account,
+    ScheduleProvider provider,
+  ) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('正在从教务系统获取最新课表...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final message = await provider.syncScheduleWithAccount(account);
+      if (context.mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('同步失败: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildScheduleDisplaySection(ScheduleProvider scheduleProvider) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

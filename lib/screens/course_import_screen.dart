@@ -15,13 +15,32 @@ class _CourseImportScreenState extends State<CourseImportScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _nicknameController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _saveAccount = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSavedAccount());
+  }
+
+  void _loadSavedAccount() {
+    final provider = Provider.of<ScheduleProvider>(context, listen: false);
+    final account = provider.getAccountForCurrentSchedule();
+    if (account != null) {
+      _usernameController.text = account.username;
+      _passwordController.text = account.password;
+      _nicknameController.text = account.nickname ?? '';
+    }
+  }
 
   @override
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
+    _nicknameController.dispose();
     super.dispose();
   }
 
@@ -38,6 +57,7 @@ class _CourseImportScreenState extends State<CourseImportScreen> {
       final result = await CourseImportService.getFullSchedule(
         _usernameController.text.trim(),
         _passwordController.text,
+        forceUpdate: true,
       );
 
       if (!mounted) return;
@@ -386,41 +406,46 @@ class _CourseImportScreenState extends State<CourseImportScreen> {
     try {
       final scheduleProvider = Provider.of<ScheduleProvider>(context, listen: false);
       
-      // 【修复 #4】同步学期开始日期
-      if (result.semesterStartDate != null) {
-        try {
-          final startDate = DateTime.parse(result.semesterStartDate!);
-          await scheduleProvider.updateCurrentScheduleStartDate(startDate);
-        } catch (e) {
-          debugPrint('同步学期日期失败: $e');
-          // 日期同步失败不影响课程导入
+      if (_saveAccount) {
+        await scheduleProvider.importAndBindAccount(
+          username: _usernameController.text.trim(),
+          password: _passwordController.text,
+          nickname: _nicknameController.text.trim().isNotEmpty
+              ? _nicknameController.text.trim()
+              : null,
+          importResult: result,
+          overwrite: overwrite,
+        );
+      } else {
+        if (result.semesterStartDate != null) {
+          try {
+            final startDate = DateTime.parse(result.semesterStartDate!);
+            await scheduleProvider.updateCurrentScheduleStartDate(startDate);
+          } catch (e) {
+            debugPrint('同步学期日期失败: $e');
+          }
+        }
+
+        if (overwrite) {
+          await scheduleProvider.overwriteCoursesBatch(result.courses!);
+        } else {
+          final nonDuplicateCourses = scheduleProvider.filterNonDuplicateCourses(result.courses!);
+          if (nonDuplicateCourses.isNotEmpty) {
+            await scheduleProvider.addCoursesBatch(nonDuplicateCourses);
+          }
         }
       }
-      
-      int importedCount;
+
+      final importedCount = result.courses!.length;
       String message;
-      
       if (overwrite) {
-        // 覆盖导入：先清空再导入所有课程
-        await scheduleProvider.overwriteCoursesBatch(result.courses!);
-        importedCount = result.courses!.length;
         message = '成功覆盖导入 $importedCount 门课程';
       } else {
-        // 【修复 #5】追加导入：过滤重复课程后再添加
-        final nonDuplicateCourses = scheduleProvider.filterNonDuplicateCourses(result.courses!);
-        final skippedCount = result.courses!.length - nonDuplicateCourses.length;
-        
-        if (nonDuplicateCourses.isNotEmpty) {
-          await scheduleProvider.addCoursesBatch(nonDuplicateCourses);
-        }
-        
-        importedCount = nonDuplicateCourses.length;
-        
-        if (skippedCount > 0) {
-          message = '成功导入 $importedCount 门课程，跳过 $skippedCount 门重复课程';
-        } else {
-          message = '成功导入 $importedCount 门课程';
-        }
+        message = '成功导入 $importedCount 门课程';
+      }
+
+      if (_saveAccount) {
+        message += '\n账号已保存，下次可直接更新课表';
       }
 
       if (mounted) {
@@ -428,9 +453,10 @@ class _CourseImportScreenState extends State<CourseImportScreen> {
           SnackBar(
             content: Text(message),
             backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
           ),
         );
-        Navigator.of(context).pop(); // 返回上一级界面
+        Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
@@ -543,7 +569,32 @@ class _CourseImportScreenState extends State<CourseImportScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 16),
+              CheckboxListTile(
+                value: _saveAccount,
+                onChanged: (value) {
+                  setState(() {
+                    _saveAccount = value ?? true;
+                  });
+                },
+                title: const Text('保存账号信息'),
+                subtitle: const Text('保存后可直接更新课表，无需重复输入'),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+              if (_saveAccount) ...[
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _nicknameController,
+                  decoration: const InputDecoration(
+                    labelText: '备注名（可选）',
+                    hintText: '如：张三',
+                    prefixIcon: Icon(Icons.badge),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _isLoading ? null : _importCourses,
                 style: ElevatedButton.styleFrom(
@@ -572,22 +623,30 @@ class _CourseImportScreenState extends State<CourseImportScreen> {
               ),
               const SizedBox(height: 16),
               Card(
-                color: Colors.orange.shade50,
+                color: _saveAccount
+                    ? Colors.blue.shade50
+                    : Colors.orange.shade50,
                 child: Padding(
                   padding: const EdgeInsets.all(12.0),
                   child: Row(
                     children: [
                       Icon(
-                        Icons.security,
-                        color: Colors.orange.shade700,
+                        _saveAccount ? Icons.save : Icons.security,
+                        color: _saveAccount
+                            ? Colors.blue.shade700
+                            : Colors.orange.shade700,
                         size: 20,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '您的账号信息仅用于获取课表，不会被保存或用于其他用途。',
+                          _saveAccount
+                              ? '账号信息将保存在本地，方便下次直接更新课表。密码仅存储在您的设备上。'
+                              : '您的账号信息仅用于获取课表，不会被保存。',
                           style: TextStyle(
-                            color: Colors.orange.shade700,
+                            color: _saveAccount
+                                ? Colors.blue.shade700
+                                : Colors.orange.shade700,
                             fontSize: 12,
                           ),
                         ),
