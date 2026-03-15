@@ -10,6 +10,7 @@ import 'screens/day_view_screen.dart';
 import 'screens/course_management_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/course_form_screen.dart';
+import 'screens/account_management_screen.dart';
 import 'screens/course_import_screen.dart';
 import 'screens/schedule_management_screen.dart';
 import 'utils/app_theme.dart';
@@ -73,6 +74,7 @@ class MyApp extends StatelessWidget {
         '/course_import': (context) => const CourseImportScreen(),
         '/course_management': (context) => const CourseManagementScreen(),
         '/schedule_management': (context) => const ScheduleManagementScreen(),
+        '/account_management': (context) => const AccountManagementScreen(),
       },
       // 添加路由生成器，处理需要传参的路由
       onGenerateRoute: (settings) {

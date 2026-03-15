@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/account.dart';
 import '../models/course.dart';
 import '../models/schedule.dart';
 import '../services/database_service.dart';
+import '../services/course_import_service.dart';
 import '../services/notification_service.dart';
 import '../services/widget_service.dart';
 
@@ -13,18 +15,19 @@ class ScheduleProvider extends ChangeNotifier {
   Schedule? _currentSchedule;
   int _currentWeek = 1;
   int _selectedWeek = 1;
-  int _selectedDay = DateTime.now().weekday; // 1-7, 对应周一到周日
+  int _selectedDay = DateTime.now().weekday;
   List<Course> _courses = [];
   List<Schedule> _schedules = [];
+  List<Account> _accounts = [];
   bool _showNonCurrentWeekCourses = false;
 
-  // Getters
   Schedule? get currentSchedule => _currentSchedule;
   int get currentWeek => _currentWeek;
   int get selectedWeek => _selectedWeek;
   int get selectedDay => _selectedDay;
   List<Course> get courses => _courses;
   List<Schedule> get schedules => _schedules;
+  List<Account> get accounts => _accounts;
   bool get showNonCurrentWeekCourses => _showNonCurrentWeekCourses;
 
   // 兼容旧代码的别名
@@ -42,11 +45,9 @@ class ScheduleProvider extends ChangeNotifier {
     // 加载设置
     await _loadSettings();
 
-    // 加载课表数据
     await loadSchedules();
-
-    // 加载课程数据
     await loadCourses();
+    await loadAccounts();
 
     // 计算当前周次
     _calculateCurrentWeek();
@@ -508,6 +509,159 @@ class ScheduleProvider extends ChangeNotifier {
   // 获取课表的课程数量
   Future<int> getScheduleCourseCount(int scheduleId) async {
     return await _databaseService.getScheduleCourseCount(scheduleId);
+  }
+
+  // =============== 账号管理方法 ===============
+
+  Future<void> loadAccounts() async {
+    _accounts = await _databaseService.getAllAccounts();
+    notifyListeners();
+  }
+
+  Future<Account> addAccount(Account account) async {
+    final id = await _databaseService.insertAccount(account);
+    final newAccount = account.copyWith(id: id);
+    _accounts.insert(0, newAccount);
+    notifyListeners();
+    return newAccount;
+  }
+
+  Future<void> updateAccount(Account account) async {
+    await _databaseService.updateAccount(account);
+    final index = _accounts.indexWhere((a) => a.id == account.id);
+    if (index != -1) {
+      _accounts[index] = account;
+    }
+    notifyListeners();
+  }
+
+  Future<void> deleteAccount(int id) async {
+    await _databaseService.deleteAccount(id);
+    _accounts.removeWhere((a) => a.id == id);
+    notifyListeners();
+  }
+
+  Account? getAccountForCurrentSchedule() {
+    if (_currentSchedule == null) return null;
+    try {
+      return _accounts.firstWhere((a) => a.scheduleId == _currentSchedule!.id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 使用已保存的账号同步课表
+  /// 返回同步结果消息
+  Future<String> syncScheduleWithAccount(Account account) async {
+    final result = await CourseImportService.getFullSchedule(
+      account.username,
+      account.password,
+    );
+
+    if (!result.success) {
+      throw Exception(result.error ?? '同步失败');
+    }
+
+    // 确保账号有关联的课表
+    int targetScheduleId;
+    if (account.scheduleId != null) {
+      targetScheduleId = account.scheduleId!;
+      // 切换到目标课表
+      if (_currentSchedule?.id != targetScheduleId) {
+        await switchSchedule(targetScheduleId);
+      }
+    } else {
+      // 没有关联课表，用当前课表，或者新建一个
+      if (_currentSchedule == null) {
+        final newSchedule = await createSmartSchedule();
+        targetScheduleId = newSchedule.id!;
+      } else {
+        targetScheduleId = _currentSchedule!.id!;
+      }
+      // 绑定账号到课表
+      final updatedAccount = account.copyWith(scheduleId: targetScheduleId);
+      await updateAccount(updatedAccount);
+    }
+
+    // 同步学期开始日期
+    if (result.semesterStartDate != null) {
+      try {
+        final startDate = DateTime.parse(result.semesterStartDate!);
+        await updateCurrentScheduleStartDate(startDate);
+      } catch (e) {
+        debugPrint('同步学期日期失败: $e');
+      }
+    }
+
+    // 覆盖导入课程
+    await overwriteCoursesBatch(result.courses!);
+
+    // 更新账号的最后同步时间
+    final syncedAccount = account.copyWith(
+      lastSyncAt: DateTime.now(),
+      scheduleId: targetScheduleId,
+    );
+    await updateAccount(syncedAccount);
+
+    return '成功同步 ${result.courses!.length} 门课程';
+  }
+
+  /// 通过账号切换课表
+  Future<void> switchToAccountSchedule(Account account) async {
+    if (account.scheduleId == null) return;
+    await switchSchedule(account.scheduleId!);
+  }
+
+  /// 导入课表并绑定账号（首次导入时使用）
+  Future<Account> importAndBindAccount({
+    required String username,
+    required String password,
+    required String? nickname,
+    required CourseImportResult importResult,
+    required bool overwrite,
+  }) async {
+    // 同步学期日期
+    if (importResult.semesterStartDate != null) {
+      try {
+        final startDate = DateTime.parse(importResult.semesterStartDate!);
+        await updateCurrentScheduleStartDate(startDate);
+      } catch (e) {
+        debugPrint('同步学期日期失败: $e');
+      }
+    }
+
+    // 导入课程
+    if (overwrite) {
+      await overwriteCoursesBatch(importResult.courses!);
+    } else {
+      final nonDuplicateCourses = filterNonDuplicateCourses(importResult.courses!);
+      if (nonDuplicateCourses.isNotEmpty) {
+        await addCoursesBatch(nonDuplicateCourses);
+      }
+    }
+
+    // 查找是否已有该用户名的账号
+    final existingAccount = _accounts.where((a) => a.username == username).firstOrNull;
+    
+    if (existingAccount != null) {
+      final updatedAccount = existingAccount.copyWith(
+        password: password,
+        nickname: nickname ?? existingAccount.nickname,
+        scheduleId: _currentSchedule?.id,
+        lastSyncAt: DateTime.now(),
+      );
+      await updateAccount(updatedAccount);
+      return updatedAccount;
+    } else {
+      final newAccount = Account(
+        username: username,
+        password: password,
+        nickname: nickname,
+        scheduleId: _currentSchedule?.id,
+        lastSyncAt: DateTime.now(),
+      );
+      return await addAccount(newAccount);
+    }
   }
 
   // =============== 兼容旧代码的方法 ===============

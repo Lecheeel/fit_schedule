@@ -4,6 +4,7 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 
+import '../models/account.dart';
 import '../models/course.dart';
 import '../models/schedule.dart';
 
@@ -11,8 +12,7 @@ class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
   static Database? _database;
 
-  // 数据库版本
-  static const int _databaseVersion = 2;
+  static const int _databaseVersion = 3;
 
   // 单例模式
   factory DatabaseService() => _instance;
@@ -101,6 +101,20 @@ class DatabaseService {
         FOREIGN KEY (scheduleId) REFERENCES schedules (id) ON DELETE CASCADE
       )
     ''');
+
+    // 创建账号表
+    await db.execute('''
+      CREATE TABLE accounts(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL,
+        password TEXT NOT NULL,
+        nickname TEXT,
+        scheduleId INTEGER,
+        createdAt TEXT NOT NULL,
+        lastSyncAt TEXT,
+        FOREIGN KEY (scheduleId) REFERENCES schedules (id) ON DELETE SET NULL
+      )
+    ''');
   }
 
   // 数据库升级（从旧版本迁移）
@@ -108,8 +122,10 @@ class DatabaseService {
     debugPrint('数据库升级: $oldVersion -> $newVersion');
 
     if (oldVersion < 2) {
-      // 从版本1升级到版本2：将semesters改为schedules，并在courses中添加scheduleId
       await _migrateToVersion2(db);
+    }
+    if (oldVersion < 3) {
+      await _migrateToVersion3(db);
     }
   }
 
@@ -204,6 +220,28 @@ class DatabaseService {
       debugPrint('版本2迁移完成');
     } catch (e) {
       debugPrint('版本2迁移失败: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> _migrateToVersion3(Database db) async {
+    debugPrint('开始迁移到版本3（账号系统）...');
+    try {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS accounts(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          username TEXT NOT NULL,
+          password TEXT NOT NULL,
+          nickname TEXT,
+          scheduleId INTEGER,
+          createdAt TEXT NOT NULL,
+          lastSyncAt TEXT,
+          FOREIGN KEY (scheduleId) REFERENCES schedules (id) ON DELETE SET NULL
+        )
+      ''');
+      debugPrint('版本3迁移完成');
+    } catch (e) {
+      debugPrint('版本3迁移失败: $e');
       rethrow;
     }
   }
@@ -438,6 +476,67 @@ class DatabaseService {
   Future<List<Course>> getCoursesByWeekAndDay(int weekNumber, int dayOfWeek) async {
     final List<Course> coursesOnDay = await getCoursesByDay(dayOfWeek);
     return coursesOnDay.where((course) => course.isActiveInWeek(weekNumber)).toList();
+  }
+
+  // =============== 账号相关操作 ===============
+
+  Future<int> insertAccount(Account account) async {
+    final db = await database;
+    return await db.insert(
+      'accounts',
+      account.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<int> updateAccount(Account account) async {
+    final db = await database;
+    return await db.update(
+      'accounts',
+      account.toMap(),
+      where: 'id = ?',
+      whereArgs: [account.id],
+    );
+  }
+
+  Future<int> deleteAccount(int id) async {
+    final db = await database;
+    return await db.delete(
+      'accounts',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<List<Account>> getAllAccounts() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'accounts',
+      orderBy: 'createdAt DESC',
+    );
+    return List.generate(maps.length, (i) => Account.fromMap(maps[i]));
+  }
+
+  Future<Account?> getAccountById(int id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'accounts',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (maps.isEmpty) return null;
+    return Account.fromMap(maps.first);
+  }
+
+  Future<Account?> getAccountByScheduleId(int scheduleId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'accounts',
+      where: 'scheduleId = ?',
+      whereArgs: [scheduleId],
+    );
+    if (maps.isEmpty) return null;
+    return Account.fromMap(maps.first);
   }
 
   // =============== 兼容性方法（保留旧API，内部转发到新实现）===============
